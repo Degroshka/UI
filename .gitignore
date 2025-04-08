@@ -1,0 +1,27 @@
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Файлы редакторов
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Временные файлы
+*.log
+*.tmp
+*.temp
+
+# Зависимости (если будут добавлены в будущем)
+node_modules/
+vendor/
+
+# Файлы конфигурации Docker (опционально)
+# Dockerfile
+# docker-compose.yml
+# .dockerignore
+
+# Файлы с конфиденциальными данными
+.env
+config.php 
