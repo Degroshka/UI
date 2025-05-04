@@ -19,10 +19,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     $user = new User();
     if ($user->authenticate($username, $password)) {
+        // Получаем must_change_password
+        $stmt = $user->conn->prepare("SELECT must_change_password FROM users WHERE username = ?");
+        $stmt->execute([$username]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         Session::set('user_id', $user->id);
         Session::set('username', $user->username);
         Session::set('role', $user->role);
-        
+        if ($row && $row['must_change_password']) {
+            header('Location: change_password.php');
+            exit();
+        }
         header("Location: index.php");
         exit();
     } else {

@@ -41,18 +41,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 // POST request - add a new schedule entry
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'search') {
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $where = [];
+        $params = [];
+        if (!empty($data['subject'])) {
+            $where[] = 'sub.name ILIKE ?';
+            $params[] = '%' . $data['subject'] . '%';
+        }
+        if (!empty($data['teacher'])) {
+            $where[] = 't.name ILIKE ?';
+            $params[] = '%' . $data['teacher'] . '%';
+        }
+        if (!empty($data['group'])) {
+            $where[] = 'g.name ILIKE ?';
+            $params[] = '%' . $data['group'] . '%';
+        }
+        if (!empty($data['type'])) {
+            $where[] = 's.type = ?';
+            $params[] = $data['type'];
+        }
+        if (!empty($data['date_from'])) {
+            $where[] = 's.date >= ?';
+            $params[] = $data['date_from'];
+        }
+        if (!empty($data['date_to'])) {
+            $where[] = 's.date <= ?';
+            $params[] = $data['date_to'];
+        }
+        if (!empty($data['time_interval'])) {
+            $times = explode('-', $data['time_interval']);
+            if (count($times) === 2) {
+                $where[] = 's.start_time = ? AND s.end_time = ?';
+                $params[] = trim($times[0]);
+                $params[] = trim($times[1]);
+            }
+        }
+        $sql = "SELECT s.*, sub.name as subject_name, t.name as teacher_name, g.name as group_name
+                FROM schedule s
+                LEFT JOIN subjects sub ON s.subject_id = sub.id
+                LEFT JOIN teachers t ON s.teacher_id = t.id
+                LEFT JOIN groups g ON s.group_id = g.id";
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY s.date, s.start_time';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($results);
+        return;
+    } catch (PDOException $e) {
+        error_log("Database error: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error occurred']);
+        return;
+    }
+}
+
+// POST request - add a new schedule entry
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $data = json_decode(file_get_contents('php://input'), true);
-        
-        if (empty($data['subject_id']) || empty($data['teacher_id']) || empty($data['group_id']) || 
-            empty($data['date']) || empty($data['start_time']) || empty($data['end_time']) || 
+        $subjectName = trim($data['subject'] ?? '');
+        $timeInterval = $data['time_interval'] ?? '';
+        $times = explode('-', $timeInterval);
+        $startTime = isset($times[0]) ? trim($times[0]) : '';
+        $endTime = isset($times[1]) ? trim($times[1]) : '';
+        if (empty($subjectName) || empty($data['teacher_id']) || empty($data['group_id']) || 
+            empty($data['date']) || empty($startTime) || empty($endTime) || 
             empty($data['room']) || empty($data['type'])) {
             http_response_code(400);
             echo json_encode(['error' => 'All fields are required']);
             exit;
         }
-
+        // Найти или создать предмет
+        $stmt = $pdo->prepare("SELECT id FROM subjects WHERE name = ?");
+        $stmt->execute([$subjectName]);
+        $subject = $stmt->fetch();
+        if ($subject) {
+            $subjectId = $subject['id'];
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO subjects (name) VALUES (?) RETURNING id");
+            $stmt->execute([$subjectName]);
+            $subjectId = $stmt->fetchColumn();
+        }
         $stmt = $pdo->prepare("
             INSERT INTO schedule (
                 subject_id, teacher_id, group_id, room, 
@@ -60,16 +134,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
-            $data['subject_id'],
+            $subjectId,
             $data['teacher_id'],
             $data['group_id'],
             $data['room'],
             $data['date'],
-            $data['start_time'],
-            $data['end_time'],
+            $startTime,
+            $endTime,
             $data['type']
         ]);
-
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
     } catch (PDOException $e) {
         error_log("Database error: " . $e->getMessage());

@@ -11,5 +11,4 @@ Session::start();
 if (!Session::get('user_id')) {
     header("Location: login.php");
     exit();
-}
-?> 
+} 

@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Ошибка: ' + data.error);
                 } else {
                     alert('Преподаватель успешно добавлен');
-                    addTeacherForm.reset();
+            addTeacherForm.reset();
                     loadTeachers();
                 }
             })
@@ -105,40 +105,91 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateFrom = document.getElementById('searchDateFrom').value;
             const dateTo = document.getElementById('searchDateTo').value;
             const type = document.getElementById('searchType').value;
-            
-            // Here you would typically send this to a PHP backend
-            alert('Поиск будет выполнен с указанными параметрами');
-        });
-    }
-
-    // Delete Group Button
-    document.querySelectorAll('.delete-group').forEach(button => {
-        button.addEventListener('click', function() {
-            const groupId = this.dataset.id;
-            if (confirm('Вы уверены, что хотите удалить эту группу?')) {
-                fetch('/api/groups.php', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ id: groupId })
-                })
+            const timeInterval = document.getElementById('searchTimeInterval').value;
+            // Если все поля пустые, просто делаем GET-запрос (всё расписание)
+            if (!subject && !teacher && !group && !dateFrom && !dateTo && !type && !timeInterval) {
+                fetch('/api/schedule.php')
                 .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert('Ошибка: ' + data.error);
+                .then(results => {
+                    const tbody = document.querySelector('#searchResultsTable tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        if (Array.isArray(results) && results.length > 0) {
+                            results.forEach(entry => {
+                                const tr = document.createElement('tr');
+                                tr.innerHTML = `
+                                    <td>${entry.date}</td>
+                                    <td>${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}</td>
+                                    <td>${entry.subject_name}</td>
+                                    <td>${entry.teacher_name}</td>
+                                    <td>${entry.group_name}</td>
+                                    <td>${entry.room}</td>
+                                    <td>${entry.type}</td>
+                                `;
+                                tbody.appendChild(tr);
+                            });
                     } else {
-                        alert('Группа успешно удалена');
-                        loadGroups();
+                            tbody.innerHTML = '<tr><td colspan="7">Нет результатов</td></tr>';
+                        }
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Произошла ошибка при удалении группы');
+                    const tbody = document.querySelector('#searchResultsTable tbody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="7">Ошибка: ${error.message}</td></tr>`;
+                    }
                 });
+                return;
             }
+            fetch('/api/schedule.php?action=search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    subject,
+                    teacher,
+                    group,
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    type,
+                    time_interval: timeInterval
+                })
+            })
+            .then(response => response.json())
+            .then(results => {
+                const tbody = document.querySelector('#searchResultsTable tbody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    if (Array.isArray(results) && results.length > 0) {
+                        results.forEach(entry => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td>${entry.date}</td>
+                                <td>${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}</td>
+                                <td>${entry.subject_name}</td>
+                                <td>${entry.teacher_name}</td>
+                                <td>${entry.group_name}</td>
+                                <td>${entry.room}</td>
+                                <td>${entry.type}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="7">Нет результатов</td></tr>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const tbody = document.querySelector('#searchResultsTable tbody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7">Ошибка: ${error.message}</td></tr>`;
+                }
+            });
         });
-    });
+    }
 
     // Edit buttons
     document.querySelectorAll('.btn-warning').forEach(button => {
@@ -154,40 +205,46 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('/api/groups.php')
             .then(response => {
                 if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || 'Failed to load groups');
-                    });
+                    throw new Error('Network response was not ok');
                 }
-                return response.json();
+                return response.text().then(text => {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('Error parsing JSON:', e);
+                        console.error('Response text:', text);
+                        throw new Error('Invalid JSON response');
+                    }
+                });
             })
             .then(groups => {
                 const tbody = document.querySelector('#groupsTable tbody');
-                if (tbody) {
-                    tbody.innerHTML = '';
-                    if (Array.isArray(groups)) {
-                        groups.forEach(group => {
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td>${group.name}</td>
-                                <td>${group.description || ''}</td>
-                                <td>
-                                    <button class="btn btn-danger delete-group" data-id="${group.id}">Удалить</button>
-                                </td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-                    } else {
-                        console.error('Received data is not an array:', groups);
-                        tbody.innerHTML = '<tr><td colspan="3">No groups found</td></tr>';
-                    }
+                tbody.innerHTML = '';
+                
+                if (!Array.isArray(groups)) {
+                    console.error('Expected array but got:', groups);
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
+                    return;
                 }
+                
+                groups.forEach(group => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${group.name}</td>
+                        <td>${group.description || ''}</td>
+                        ${isAdmin ? `
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})">Удалить</button>
+                        </td>
+                        ` : ''}
+                    `;
+                    tbody.appendChild(tr);
+                });
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error loading groups:', error);
                 const tbody = document.querySelector('#groupsTable tbody');
-                if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="3">Error: ${error.message}</td></tr>`;
-                }
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
             });
     }
 
@@ -220,6 +277,34 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                             tbody.appendChild(tr);
                         });
+                        // Навешиваем обработчики после отрисовки
+                        tbody.querySelectorAll('.delete-teacher').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const teacherId = this.dataset.id;
+                                if (confirm('Вы уверены, что хотите удалить этого преподавателя?')) {
+                                    fetch('/api/teachers.php', {
+                                        method: 'DELETE',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({ id: teacherId })
+                                    })
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        if (data.error) {
+                                            alert('Ошибка: ' + data.error);
+                                        } else {
+                                            alert('Преподаватель успешно удален');
+                                            loadTeachers();
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error('Error:', error);
+                                        alert('Произошла ошибка при удалении преподавателя');
+                                    });
+                                }
+                            });
+                        });
                     } else {
                         console.error('Received data is not an array:', teachers);
                         tbody.innerHTML = '<tr><td colspan="5">No teachers found</td></tr>';
@@ -235,35 +320,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Delete Teacher Button
-    document.querySelectorAll('.delete-teacher').forEach(button => {
-        button.addEventListener('click', function() {
-            const teacherId = this.dataset.id;
-            if (confirm('Вы уверены, что хотите удалить этого преподавателя?')) {
-                fetch('/api/teachers.php', {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ id: teacherId })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert('Ошибка: ' + data.error);
-                    } else {
-                        alert('Преподаватель успешно удален');
-                        loadTeachers();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Произошла ошибка при удалении преподавателя');
-                });
-            }
-        });
-    });
-
     // Load groups on page load
     if (document.getElementById('groupsTable')) {
         loadGroups();
@@ -277,21 +333,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add Schedule Form
     const addScheduleForm = document.getElementById('addScheduleForm');
     if (addScheduleForm) {
-        // Load dropdowns data
+        // Load teachers and groups for dropdowns
         Promise.all([
-            fetch('/api/subjects.php').then(res => res.json()),
             fetch('/api/teachers.php').then(res => res.json()),
             fetch('/api/groups.php').then(res => res.json())
-        ]).then(([subjects, teachers, groups]) => {
-            // Populate subjects dropdown
-            const subjectSelect = document.getElementById('subject');
-            subjects.forEach(subject => {
-                const option = document.createElement('option');
-                option.value = subject.id;
-                option.textContent = subject.name;
-                subjectSelect.appendChild(option);
-            });
-
+        ]).then(([teachers, groups]) => {
             // Populate teachers dropdown
             const teacherSelect = document.getElementById('teacher');
             teachers.forEach(teacher => {
@@ -313,13 +359,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         addScheduleForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const subjectId = document.getElementById('subject').value;
+            const subjectName = document.getElementById('subject').value;
             const teacherId = document.getElementById('teacher').value;
             const groupId = document.getElementById('group').value;
             const room = document.getElementById('room').value;
             const date = document.getElementById('date').value;
-            const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
+            const timeInterval = document.getElementById('timeInterval').value;
             const type = document.getElementById('type').value;
             
             fetch('/api/schedule.php', {
@@ -328,13 +373,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    subject_id: subjectId,
+                    subject: subjectName,
                     teacher_id: teacherId,
                     group_id: groupId,
                     room: room,
                     date: date,
-                    start_time: startTime,
-                    end_time: endTime,
+                    time_interval: timeInterval,
                     type: type
                 })
             })
@@ -375,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
                                 <td>${entry.date}</td>
-                                <td>${entry.start_time} - ${entry.end_time}</td>
+                                <td>${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}</td>
                                 <td>${entry.subject_name}</td>
                                 <td>${entry.teacher_name}</td>
                                 <td>${entry.group_name}</td>
@@ -435,4 +479,110 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('scheduleTable')) {
         loadSchedule();
     }
-}); 
+
+    // Автозаполнение выпадающих списков поиска
+    if (document.getElementById('searchForm')) {
+        fetch('/api/groups.php')
+            .then(res => res.json())
+            .then(groups => {
+                const select = document.getElementById('searchGroup');
+                if (select && Array.isArray(groups)) {
+                    groups.forEach(g => {
+                        const option = document.createElement('option');
+                        option.value = g.name;
+                        option.textContent = g.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        fetch('/api/teachers.php')
+            .then(res => res.json())
+            .then(teachers => {
+                const select = document.getElementById('searchTeacher');
+                if (select && Array.isArray(teachers)) {
+                    teachers.forEach(t => {
+                        const option = document.createElement('option');
+                        option.value = t.name;
+                        option.textContent = t.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+        fetch('/api/subjects.php')
+            .then(res => res.json())
+            .then(subjects => {
+                const select = document.getElementById('searchSubject');
+                if (select && Array.isArray(subjects)) {
+                    subjects.forEach(s => {
+                        const option = document.createElement('option');
+                        option.value = s.name;
+                        option.textContent = s.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+    }
+
+    // Форма создания пользователя-студента
+    const addStudentUserForm = document.getElementById('addStudentUserForm');
+    if (addStudentUserForm) {
+        addStudentUserForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fullName = document.getElementById('studentFullName').value.trim();
+            if (!fullName) return;
+            // Берём фамилию (первое слово)
+            const surname = fullName.split(' ')[0];
+            // Транслитерация фамилии
+            const login = translit(surname.toLowerCase());
+            // Генерация временного пароля
+            const tempPassword = generatePassword(8);
+            fetch('/api/users.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: login,
+                    password: tempPassword,
+                    full_name: fullName,
+                    role: 'student'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const resultDiv = document.getElementById('studentUserResult');
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class='alert alert-success'>Пользователь создан!<br>Логин: <b>${login}</b><br>Временный пароль: <b>${tempPassword}</b></div>`;
+                    addStudentUserForm.reset();
+                } else {
+                    resultDiv.innerHTML = `<div class='alert alert-danger'>Ошибка: ${data.error || 'Не удалось создать пользователя'}</div>`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('studentUserResult').innerHTML = `<div class='alert alert-danger'>Ошибка: ${err}</div>`;
+            });
+        });
+    }
+});
+
+function formatTime(t) {
+    if (!t) return '';
+    return t.slice(0,5);
+}
+
+// Функция транслитерации
+function translit(text) {
+    const map = {
+        а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya',
+        А:'A',Б:'B',В:'V',Г:'G',Д:'D',Е:'E',Ё:'E',Ж:'Zh',З:'Z',И:'I',Й:'Y',К:'K',Л:'L',М:'M',Н:'N',О:'O',П:'P',Р:'R',С:'S',Т:'T',У:'U',Ф:'F',Х:'H',Ц:'Ts',Ч:'Ch',Ш:'Sh',Щ:'Sch',Ъ:'',Ы:'Y',Ь:'',Э:'E',Ю:'Yu',Я:'Ya'
+    };
+    return text.split('').map(c => map[c] || c).join('');
+}
+
+// Функция генерации пароля
+function generatePassword(length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let pass = '';
+    for (let i = 0; i < length; i++) {
+        pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pass;
+} 

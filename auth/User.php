@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../config/database.php';
 
 class User {
-    private $conn;
+    public $conn;
     private $table_name = "users";
 
     public $id;
@@ -66,5 +66,4 @@ class User {
         
         return $stmt->execute();
     }
-}
-?> 
+} 
