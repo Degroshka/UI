@@ -1,43 +1,27 @@
+# Используем официальный образ PHP с Apache
 FROM php:8.2-apache
 
-# Установка необходимых расширений PHP
+# Устанавливаем необходимые расширения PHP
 RUN apt-get update && apt-get install -y \
     libpq-dev \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    postgresql-client \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql
+    && docker-php-ext-install pdo pdo_mysql
 
-# Включение mod_rewrite
+# Включаем модуль mod_rewrite для Apache
 RUN a2enmod rewrite
 
-# Копирование файлов приложения
+# Копируем файлы приложения
 COPY . /var/www/html/
 
-# Настройка прав доступа
-RUN chown -R www-data:www-data /var/www/html
+# Устанавливаем права на запись для сессий
+RUN mkdir -p /var/www/html/sessions && \
+    chown -R www-data:www-data /var/www/html/sessions
 
-# Настройка Apache
-RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
+# Настраиваем Apache
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
+    sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
-# Создание скрипта инициализации
-RUN echo '#!/bin/bash\n\
-echo "Waiting for database to be ready..."\n\
-while ! pg_isready -h db -U postgres -p 5432 > /dev/null 2>&1; do\n\
-  sleep 1\n\
-done\n\
-echo "Database is ready!"\n\
-php -f /var/www/html/database/create_superuser.php\n\
-apache2-foreground' > /usr/local/bin/start.sh && \
-chmod +x /usr/local/bin/start.sh
+# Открываем порт 8000
+EXPOSE 8000
 
-# Открытие порта
-EXPOSE 80
-
-# Запуск скрипта инициализации
-CMD ["/usr/local/bin/start.sh"]
-
-# Установка рабочей директории
-WORKDIR /var/www/html 
+# Запускаем Apache
+CMD ["apache2-foreground"] 

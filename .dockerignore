@@ -9,4 +9,6 @@ Dockerfile
 README.md
 node_modules
 vendor
-postgres_data 
+postgres_data
+sessions/*
+!sessions/.gitkeep 

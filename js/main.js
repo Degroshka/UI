@@ -271,9 +271,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td>${teacher.department || ''}</td>
                                 <td>${teacher.position || ''}</td>
                                 <td>${teacher.email || ''}</td>
+                                ${isAdmin ? `
                                 <td>
-                                    <button class="btn btn-danger delete-teacher" data-id="${teacher.id}">Удалить</button>
+                                    <button class="btn btn-sm btn-danger delete-teacher" data-id="${teacher.id}">Удалить</button>
+                                    <button class="btn btn-sm btn-primary create-user" data-id="${teacher.id}" data-name="${teacher.name}">Создать пользователя</button>
                                 </td>
+                                ` : ''}
                             `;
                             tbody.appendChild(tr);
                         });
@@ -301,6 +304,43 @@ document.addEventListener('DOMContentLoaded', function() {
                                     .catch(error => {
                                         console.error('Error:', error);
                                         alert('Произошла ошибка при удалении преподавателя');
+                                    });
+                                }
+                            });
+                        });
+                        // Обработчики для кнопок создания пользователя
+                        tbody.querySelectorAll('.create-user').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const teacherId = this.dataset.id;
+                                const teacherName = this.dataset.name;
+                                // Берём фамилию (первое слово)
+                                const surname = teacherName.split(' ')[0];
+                                // Транслитерация фамилии
+                                const login = translit(surname.toLowerCase());
+                                // Генерация временного пароля
+                                const tempPassword = generatePassword(8);
+                                
+                                if (confirm(`Создать пользователя для преподавателя ${teacherName}?`)) {
+                                    fetch('/api/users.php', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            username: login,
+                                            password: tempPassword,
+                                            full_name: teacherName,
+                                            role: 'teacher'
+                                        })
+                                    })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            alert(`Пользователь создан!\nЛогин: ${login}\nВременный пароль: ${tempPassword}`);
+                                        } else {
+                                            alert('Ошибка: ' + (data.error || 'Не удалось создать пользователя'));
+                                        }
+                                    })
+                                    .catch(err => {
+                                        alert('Ошибка: ' + err);
                                     });
                                 }
                             });
@@ -558,6 +598,45 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(err => {
                 document.getElementById('studentUserResult').innerHTML = `<div class='alert alert-danger'>Ошибка: ${err}</div>`;
+            });
+        });
+    }
+
+    // Форма создания пользователя-преподавателя
+    const addTeacherUserForm = document.getElementById('addTeacherUserForm');
+    if (addTeacherUserForm) {
+        addTeacherUserForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fullName = document.getElementById('teacherFullName').value.trim();
+            if (!fullName) return;
+            // Берём фамилию (первое слово)
+            const surname = fullName.split(' ')[0];
+            // Транслитерация фамилии
+            const login = translit(surname.toLowerCase());
+            // Генерация временного пароля
+            const tempPassword = generatePassword(8);
+            fetch('/api/users.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: login,
+                    password: tempPassword,
+                    full_name: fullName,
+                    role: 'teacher'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const resultDiv = document.getElementById('teacherUserResult');
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class='alert alert-success'>Пользователь создан!<br>Логин: <b>${login}</b><br>Временный пароль: <b>${tempPassword}</b></div>`;
+                    addTeacherUserForm.reset();
+                } else {
+                    resultDiv.innerHTML = `<div class='alert alert-danger'>Ошибка: ${data.error || 'Не удалось создать пользователя'}</div>`;
+                }
+            })
+            .catch(err => {
+                document.getElementById('teacherUserResult').innerHTML = `<div class='alert alert-danger'>Ошибка: ${err}</div>`;
             });
         });
     }
