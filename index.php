@@ -34,6 +34,9 @@ require_once 'auth/check_auth.php';
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
+                        <span class="nav-link">Вы вошли как: <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="logout.php">Выйти</a>
                     </li>
                 </ul>
@@ -45,7 +48,6 @@ require_once 'auth/check_auth.php';
         <div class="row">
             <div class="col-md-12">
                 <h1 class="text-center mb-4">Добро пожаловать в систему управления расписанием</h1>
-                <p class="text-center">Вы вошли как: <?php echo htmlspecialchars($_SESSION['username']); ?></p>
             </div>
         </div>
         
@@ -83,5 +85,4 @@ require_once 'auth/check_auth.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/main.js"></script>
 </body>
-</html> 
 </html> 
