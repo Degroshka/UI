@@ -186,9 +186,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const tbody = document.querySelector('#searchResultsTable tbody');
                 if (tbody) {
                     tbody.innerHTML = `<tr><td colspan="7">Ошибка: ${error.message}</td></tr>`;
-                }
-            });
+            }
         });
+    });
     }
 
     // Edit buttons
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(groups => {
                 const tbody = document.querySelector('#groupsTable tbody');
-                tbody.innerHTML = '';
+                    tbody.innerHTML = '';
                 
                 if (!Array.isArray(groups)) {
                     console.error('Expected array but got:', groups);
@@ -227,19 +227,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                groups.forEach(group => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${group.name}</td>
-                        <td>${group.description || ''}</td>
+                    groups.forEach(group => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${group.name}</td>
+                            <td>${group.description || ''}</td>
                         ${isAdmin ? `
-                        <td>
+                            <td>
                             <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})">Удалить</button>
-                        </td>
+                            </td>
                         ` : ''}
-                    `;
-                    tbody.appendChild(tr);
-                });
+                        `;
+                        tbody.appendChild(tr);
+                    });
             })
             .catch(error => {
                 console.error('Error loading groups:', error);

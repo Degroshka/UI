@@ -16,7 +16,7 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
-
+    error_log("Trying login: $username / $password");
     $user = new User();
     if ($user->authenticate($username, $password)) {
         // Получаем must_change_password

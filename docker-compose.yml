@@ -1,27 +1,38 @@
-version: '3'
+version: '3.8'
 
 services:
-  web:
-    image: your-dockerhub-username/schedule:latest
+  app:
+    build: .
     ports:
-      - "8000:8000"
+      - "8000:80"
     volumes:
-      - ./sessions:/var/www/html/sessions
+      - .:/var/www/html
     environment:
-      - MYSQL_HOST=db
-      - MYSQL_USER=root
-      - MYSQL_PASSWORD=root
-      - MYSQL_DATABASE=schedule
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=schedule
+      - DB_USER=admin
+      - DB_PASSWORD=postgres
     depends_on:
-      - db
+      - postgres
+    networks:
+      - demo
 
-  db:
-    image: mysql:8.0
+  postgres:
+    image: postgres:16
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=schedule
+      - POSTGRES_DB=schedule
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=postgres
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d  # автоматическая инициализация
+    networks:
+      - demo
 
 volumes:
-  mysql_data: 
+  postgres_data:
+
+networks:
+  demo:
+    driver: bridge
