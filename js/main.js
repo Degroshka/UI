@@ -1,8 +1,116 @@
+// Function to load groups
+function loadGroups() {
+    fetch('/api/groups.php')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.text().then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Error parsing JSON:', e);
+                    console.error('Response text:', text);
+                    throw new Error('Invalid JSON response');
+                }
+            });
+        })
+        .then(groups => {
+            const tbody = document.querySelector('#groupsTable tbody');
+            tbody.innerHTML = '';
+            
+            if (!Array.isArray(groups)) {
+                console.error('Expected array but got:', groups);
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
+                return;
+            }
+            
+            groups.forEach(group => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${group.name}</td>
+                    <td>${group.description || ''}</td>
+                    ${isAdmin ? `
+                        <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})">Удалить</button>
+                        </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading groups:', error);
+            const tbody = document.querySelector('#groupsTable tbody');
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
+        });
+}
+
+// Function to load schedule
+function loadSchedule() {
+    fetch('/api/schedule.php')
+        .then(response => response.json())
+        .then(schedule => {
+            const tbody = document.querySelector('#scheduleTable tbody');
+            tbody.innerHTML = '';
+            
+            schedule.forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${entry.date}</td>
+                    <td>${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}</td>
+                    <td>${entry.subject_name}</td>
+                    <td>${entry.teacher_name}</td>
+                    <td>${entry.group_name}</td>
+                    <td>${entry.room}</td>
+                    <td>${entry.type}</td>
+                    ${isAdmin ? `
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteScheduleEntry(${entry.id})">Удалить</button>
+                        </td>
+                    ` : ''}
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const tbody = document.querySelector('#scheduleTable tbody');
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">Ошибка загрузки данных</td></tr>';
+        });
+}
+
 // Form submission handlers
 document.addEventListener('DOMContentLoaded', function() {
     // Add Group Form
     const addGroupForm = document.getElementById('addGroupForm');
     if (addGroupForm) {
+        const groupNameInput = document.getElementById('groupName');
+        const submitButton = addGroupForm.querySelector('button[type="submit"]');
+        let existingGroups = [];
+
+        // Load existing groups on page load
+        fetch('/api/groups.php')
+            .then(response => response.json())
+            .then(groups => {
+                existingGroups = groups.map(g => g.name.toLowerCase());
+            })
+            .catch(error => console.error('Error loading groups:', error));
+
+        // Real-time validation
+        groupNameInput.addEventListener('input', function() {
+            const name = this.value.trim().toLowerCase();
+            const isDuplicate = existingGroups.includes(name);
+            
+            if (isDuplicate) {
+                this.setCustomValidity('Группа с таким названием уже существует');
+                submitButton.disabled = true;
+            } else {
+                this.setCustomValidity('');
+                submitButton.disabled = false;
+            }
+        });
+
         addGroupForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const groupName = document.getElementById('groupName').value;
@@ -25,6 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     alert('Группа успешно добавлена');
                     addGroupForm.reset();
+                    // Add the new group to our list
+                    existingGroups.push(groupName.toLowerCase());
                     // Refresh the groups list
                     loadGroups();
                 }
@@ -199,54 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Редактирование элемента');
         });
     });
-
-    // Function to load groups
-    function loadGroups() {
-        fetch('/api/groups.php')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text().then(text => {
-                    try {
-                        return JSON.parse(text);
-                    } catch (e) {
-                        console.error('Error parsing JSON:', e);
-                        console.error('Response text:', text);
-                        throw new Error('Invalid JSON response');
-                    }
-                });
-            })
-            .then(groups => {
-                const tbody = document.querySelector('#groupsTable tbody');
-                    tbody.innerHTML = '';
-                
-                if (!Array.isArray(groups)) {
-                    console.error('Expected array but got:', groups);
-                    tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
-                    return;
-                }
-                
-                    groups.forEach(group => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${group.name}</td>
-                            <td>${group.description || ''}</td>
-                        ${isAdmin ? `
-                            <td>
-                            <button class="btn btn-sm btn-danger" onclick="deleteGroup(${group.id})">Удалить</button>
-                            </td>
-                        ` : ''}
-                        `;
-                        tbody.appendChild(tr);
-                    });
-            })
-            .catch(error => {
-                console.error('Error loading groups:', error);
-                const tbody = document.querySelector('#groupsTable tbody');
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center">Ошибка загрузки данных</td></tr>';
-            });
-    }
 
     // Function to load teachers
     function loadTeachers() {
@@ -439,53 +501,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Function to load schedule
-    function loadSchedule() {
-        fetch('/api/schedule.php')
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || 'Failed to load schedule');
-                    });
-                }
-                return response.json();
-            })
-            .then(schedule => {
-                const tbody = document.querySelector('#scheduleTable tbody');
-                if (tbody) {
-                    tbody.innerHTML = '';
-                    if (Array.isArray(schedule)) {
-                        schedule.forEach(entry => {
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td>${entry.date}</td>
-                                <td>${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}</td>
-                                <td>${entry.subject_name}</td>
-                                <td>${entry.teacher_name}</td>
-                                <td>${entry.group_name}</td>
-                                <td>${entry.room}</td>
-                                <td>${entry.type}</td>
-                                <td>
-                                    <button class="btn btn-danger delete-schedule" data-id="${entry.id}">Удалить</button>
-                                </td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
-                    } else {
-                        console.error('Received data is not an array:', schedule);
-                        tbody.innerHTML = '<tr><td colspan="8">No schedule entries found</td></tr>';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                const tbody = document.querySelector('#scheduleTable tbody');
-                if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
-                }
-            });
-    }
-
     // Delete Schedule Button
     document.querySelectorAll('.delete-schedule').forEach(button => {
         button.addEventListener('click', function() {
@@ -664,4 +679,58 @@ function generatePassword(length) {
         pass += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return pass;
+}
+
+// Function to delete a group
+function deleteGroup(groupId) {
+    if (!confirm('Вы уверены, что хотите удалить эту группу?')) {
+        return;
+    }
+
+    fetch(`/api/groups.php?id=${groupId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Ошибка: ' + data.error);
+        } else {
+            alert('Группа успешно удалена');
+            loadGroups();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Произошла ошибка при удалении группы');
+    });
+}
+
+// Function to delete a schedule entry
+function deleteScheduleEntry(entryId) {
+    if (!confirm('Вы уверены, что хотите удалить это занятие?')) {
+        return;
+    }
+
+    fetch(`/api/schedule.php?id=${entryId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Ошибка: ' + data.error);
+        } else {
+            alert('Занятие успешно удалено');
+            loadSchedule();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Произошла ошибка при удалении занятия');
+    });
 } 

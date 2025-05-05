@@ -41,6 +41,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // Check if teacher with same name and email already exists
+        if (!empty($data['email'])) {
+            $stmt = $pdo->prepare("SELECT id FROM teachers WHERE (name = ? AND email = ?) OR email = ?");
+            $stmt->execute([$data['name'], $data['email'], $data['email']]);
+            if ($stmt->fetch()) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Преподаватель с таким именем и email или email уже существует']);
+                exit;
+            }
+        }
+
         $stmt = $pdo->prepare("INSERT INTO teachers (name, department, position, email) VALUES (?, ?, ?, ?)");
         $stmt->execute([
             $data['name'],
@@ -52,8 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
     } catch (PDOException $e) {
         error_log("Database error: " . $e->getMessage());
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error occurred']);
+        if (strpos($e->getMessage(), 'unique constraint') !== false) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Преподаватель с таким именем и email или email уже существует']);
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Database error occurred']);
+        }
     }
 }
 
