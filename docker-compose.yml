@@ -13,6 +13,7 @@ services:
       - DB_NAME=schedule
       - DB_USER=admin
       - DB_PASSWORD=postgres
+
     depends_on:
       - postgres
     networks:
@@ -36,3 +37,4 @@ volumes:
 networks:
   demo:
     driver: bridge
+
