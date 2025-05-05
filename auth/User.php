@@ -20,19 +20,22 @@ class User {
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(":username", $username);
         $stmt->execute();
-
+    
         if ($stmt->rowCount() > 0) {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log("Пароль в базе данных: " . $row['password']);
             if (password_verify($password, $row['password'])) {
                 $this->id = $row['id'];
                 $this->username = $row['username'];
                 $this->role = $row['role'];
                 return true;
+            } else {
+                error_log("Неверный пароль");
             }
         }
         return false;
     }
-
+    
     public function createSuperUser() {
         // Проверяем, существует ли уже суперпользователь
         $query = "SELECT id FROM " . $this->table_name . " WHERE role = 'superuser'";
@@ -66,4 +69,4 @@ class User {
         
         return $stmt->execute();
     }
-} 
+}

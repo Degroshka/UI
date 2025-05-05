@@ -52,4 +52,15 @@ CREATE TABLE IF NOT EXISTS users (
     must_change_password BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-); 
+);
+
+-- Insert default admin user
+INSERT INTO users (username, password, role, full_name, must_change_password)
+VALUES (
+    'admin',
+    '$2y$10$wXZUCBQi7BfTo6q3YJd3vOIE6qM9vAu4/kz7ZXaAoSLRxYFvqqxz6',
+    'admin',
+    'Administrator',
+    FALSE
+)
+ON CONFLICT (username) DO NOTHING;
