@@ -116,6 +116,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['error' => 'All fields are required']);
             exit;
         }
+
+        // Check if teacher already has a class at this time
+        $stmt = $pdo->prepare("SELECT id FROM schedule WHERE teacher_id = ? AND date = ? AND start_time = ? AND end_time = ?");
+        $stmt->execute([$data['teacher_id'], $data['date'], $startTime, $endTime]);
+        if ($stmt->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'У преподавателя уже есть занятие в это время']);
+            exit;
+        }
+
         // Найти или создать предмет
         $stmt = $pdo->prepare("SELECT id FROM subjects WHERE name = ?");
         $stmt->execute([$subjectName]);
@@ -143,26 +153,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $endTime,
             $data['type']
         ]);
-        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+        echo json_encode(['success' => true]);
     } catch (PDOException $e) {
         error_log("Database error: " . $e->getMessage());
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error occurred']);
+        if (strpos($e->getMessage(), 'unique constraint') !== false) {
+            http_response_code(400);
+            echo json_encode(['error' => 'У преподавателя уже есть занятие в это время']);
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Database error occurred']);
+        }
     }
 }
 
 // DELETE request - delete a schedule entry
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    require_once '../auth/permissions.php';
+    
+    if (!isAdmin()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Access denied']);
+        exit;
+    }
+
+    $id = $_GET['id'] ?? null;
+
+    if (!$id) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Schedule entry ID is required']);
+        exit;
+    }
+
     try {
-        $data = json_decode(file_get_contents('php://input'), true);
-        $id = $data['id'] ?? null;
-
-        if (!$id) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Schedule entry ID is required']);
-            exit;
-        }
-
         // Check if schedule entry exists
         $stmt = $pdo->prepare("SELECT id FROM schedule WHERE id = ?");
         $stmt->execute([$id]);

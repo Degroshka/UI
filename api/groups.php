@@ -69,6 +69,15 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
+        // Check if group name already exists
+        $stmt = $pdo->prepare("SELECT id FROM groups WHERE name = ?");
+        $stmt->execute([$data['name']]);
+        if ($stmt->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Группа с таким названием уже существует']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("INSERT INTO groups (name, description) VALUES (?, ?)");
         $stmt->execute([$data['name'], $data['description'] ?? null]);
         

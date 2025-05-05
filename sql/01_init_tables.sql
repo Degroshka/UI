@@ -1,7 +1,7 @@
 -- Create groups table
 CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -13,9 +13,10 @@ CREATE TABLE IF NOT EXISTS teachers (
     name VARCHAR(255) NOT NULL,
     department VARCHAR(255),
     position VARCHAR(255),
-    email VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, email)
 );
 
 -- Create subjects table
@@ -39,7 +40,8 @@ CREATE TABLE IF NOT EXISTS schedule (
     end_time TIME NOT NULL,
     type VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(teacher_id, date, start_time, end_time)
 );
 
 -- Create users table
