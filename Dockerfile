@@ -21,9 +21,12 @@ RUN mkdir -p /var/www/html/sessions && \
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
     sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
-# Создаем скрипт для инициализации базы данных
-COPY init-db.sh /docker-entrypoint-initdb.d/
-RUN chmod +x /docker-entrypoint-initdb.d/init-db.sh
+# Копируем SQL файлы инициализации
+COPY sql/01_init_tables.sql /docker-entrypoint-initdb.d/
+COPY sql/02_create_admin.sql /docker-entrypoint-initdb.d/
+
+# Устанавливаем права на выполнение
+RUN chmod +x /docker-entrypoint-initdb.d/*.sql
 
 # Открываем порт 8000
 EXPOSE 8000
